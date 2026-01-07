@@ -2,43 +2,84 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>IITM US GPA Calculator</title>
+  <title>IITM → US GPA Calculator</title>
+
+  <!-- PDF.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+    }
+    input, button {
+      margin-top: 15px;
+    }
+  </style>
 </head>
+
 <body>
-  <h1>IITM → US GPA Calculator (4.0 scale)</h1>
+  <h1>IITM → US GPA Calculator (4.0 Scale)</h1>
 
-  <textarea id="input" rows="10" cols="70"
-    placeholder="Paste transcript lines here..."></textarea>
-  <br><br>
+  <p>
+    Upload your <strong>IIT Madras transcript PDF</strong>.
+    Processing happens entirely in your browser.
+  </p>
 
-  <button onclick="calculate()">Calculate GPA</button>
+  <input type="file" id="pdfInput" accept="application/pdf">
+  <br>
+  <button onclick="processPDF()">Calculate GPA</button>
 
   <h2 id="result"></h2>
 
   <script>
     const gradeMap = {
-      'S': 4.0, 'A': 4.0, 'B': 3.5,
-      'C': 3.0, 'D': 2.5, 'E': 2.0, 'U': 0.0
+      'S': 4.0,
+      'A': 4.0,
+      'B': 3.5,
+      'C': 3.0,
+      'D': 2.5,
+      'E': 2.0,
+      'U': 0.0
     };
 
-    function calculate() {
-      let lines = document.getElementById("input").value.split("\n");
-      let credits = 0, points = 0;
+    async function processPDF() {
+      const file = document.getElementById('pdfInput').files[0];
+      if (!file) {
+        alert("Please upload a transcript PDF.");
+        return;
+      }
 
-      lines.forEach(line => {
-        let m = line.match(/\s(\d+)\s+([SABCDEU])\s/);
-        if (m) {
-          let c = parseInt(m[1]);
-          let g = m[2];
-          credits += c;
-          points += c * gradeMap[g];
-        }
-      });
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+      let totalCredits = 0;
+      let totalPoints = 0;
+
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const text = textContent.items.map(item => item.str).join(" ");
+
+        // Match patterns like: "9 B" , "12 A" etc.
+        const matches = [...text.matchAll(/\b(\d+)\s+([SABCDEU])\b/g)];
+
+        matches.forEach(m => {
+          const credits = parseInt(m[1]);
+          const grade = m[2];
+
+          if (credits === 0 || grade === 'P') return;
+
+          totalCredits += credits;
+          totalPoints += credits * gradeMap[grade];
+        });
+      }
 
       document.getElementById("result").innerText =
-        credits > 0
-          ? `GPA (4.0 scale): ${(points / credits).toFixed(2)}`
-          : "No valid courses found";
+        totalCredits > 0
+          ? `GPA (4.0 scale): ${(totalPoints / totalCredits).toFixed(2)}`
+          : "No valid courses found.";
     }
   </script>
 </body>
