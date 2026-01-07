@@ -36,54 +36,98 @@
 
   <h2 id="result"></h2>
 
-  <script>
-    const gradeMap = {
-      'S': 4.0,
-      'A': 4.0,
-      'B': 3.5,
-      'C': 3.0,
-      'D': 2.5,
-      'E': 2.0,
-      'U': 0.0
-    };
+  <table id="breakdown" border="1" cellpadding="8" style="margin-top:20px; display:none;">
+    <thead>
+      <tr>
+        <th>US GPA</th>
+        <th>IIT Grade(s)</th>
+        <th>Credits</th>
+      </tr>
+    </thead>
+    <tbody id="breakdownBody"></tbody>
+  </table>
 
-    async function processPDF() {
-      const file = document.getElementById('pdfInput').files[0];
-      if (!file) {
-        alert("Please upload a transcript PDF.");
-        return;
+
+    <script>
+      const gradeMap = {
+        'S': 4.0,
+        'A': 4.0,
+        'B': 3.5,
+        'C': 3.0,
+        'D': 2.5,
+        'E': 2.0,
+        'U': 0.0
+      };
+
+      const buckets = {
+        4.0: ['S', 'A'],
+        3.5: ['B'],
+        3.0: ['C'],
+        2.5: ['D'],
+        2.0: ['E'],
+        0.0: ['U']
+      };
+
+      async function processPDF() {
+        const file = document.getElementById('pdfInput').files[0];
+        if (!file) {
+          alert("Please upload a transcript PDF.");
+          return;
+        }
+
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+        let totalCredits = 0;
+        let totalPoints = 0;
+
+        let creditBreakdown = {
+          4.0: 0,
+          3.5: 0,
+          3.0: 0,
+          2.5: 0,
+          2.0: 0,
+          0.0: 0
+        };
+
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          const text = textContent.items.map(item => item.str).join(" ");
+
+          const matches = [...text.matchAll(/\b(\d+)\s+([SABCDEU])\b/g)];
+
+          matches.forEach(m => {
+            const credits = parseInt(m[1]);
+            const grade = m[2];
+
+            if (credits === 0 || grade === 'P') return;
+
+            const gpa = gradeMap[grade];
+            totalCredits += credits;
+            totalPoints += credits * gpa;
+            creditBreakdown[gpa] += credits;
+          });
+        }
+
+        const gpaFinal = totalPoints / totalCredits;
+
+        document.getElementById("result").innerText =
+          `GPA (4.0 scale): ${gpaFinal.toFixed(2)} | Total Credits: ${totalCredits}`;
+
+        const tbody = document.getElementById("breakdownBody");
+        tbody.innerHTML = "";
+
+        for (const gpa in buckets) {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${gpa}</td>
+            <td>${buckets[gpa].join(", ")}</td>
+            <td>${creditBreakdown[gpa]}</td>
+          `;
+          tbody.appendChild(row);
+        }
+
+        document.getElementById("breakdown").style.display = "table";
       }
-
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-
-      let totalCredits = 0;
-      let totalPoints = 0;
-
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const text = textContent.items.map(item => item.str).join(" ");
-
-        // Match patterns like: "9 B" , "12 A" etc.
-        const matches = [...text.matchAll(/\b(\d+)\s+([SABCDEU])\b/g)];
-
-        matches.forEach(m => {
-          const credits = parseInt(m[1]);
-          const grade = m[2];
-
-          if (credits === 0 || grade === 'P') return;
-
-          totalCredits += credits;
-          totalPoints += credits * gradeMap[grade];
-        });
-      }
-
-      document.getElementById("result").innerText =
-        totalCredits > 0
-          ? `GPA (4.0 scale): ${(totalPoints / totalCredits).toFixed(2)}`
-          : "No valid courses found.";
-    }
-  </script>
-</body>
-</html>
+    </script>
