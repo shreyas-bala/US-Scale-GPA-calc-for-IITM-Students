@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>IITM US GPA Calculator</title>
+</head>
+<body>
+  <h1>IITM → US GPA Calculator (4.0 scale)</h1>
+
+  <textarea id="input" rows="10" cols="70"
+    placeholder="Paste transcript lines here..."></textarea>
+  <br><br>
+
+  <button onclick="calculate()">Calculate GPA</button>
+
+  <h2 id="result"></h2>
+
+  <script>
+    const gradeMap = {
+      'S': 4.0, 'A': 4.0, 'B': 3.5,
+      'C': 3.0, 'D': 2.5, 'E': 2.0, 'U': 0.0
+    };
+
+    function calculate() {
+      let lines = document.getElementById("input").value.split("\n");
+      let credits = 0, points = 0;
+
+      lines.forEach(line => {
+        let m = line.match(/\s(\d+)\s+([SABCDEU])\s/);
+        if (m) {
+          let c = parseInt(m[1]);
+          let g = m[2];
+          credits += c;
+          points += c * gradeMap[g];
+        }
+      });
+
+      document.getElementById("result").innerText =
+        credits > 0
+          ? `GPA (4.0 scale): ${(points / credits).toFixed(2)}`
+          : "No valid courses found";
+    }
+  </script>
+</body>
+</html>
